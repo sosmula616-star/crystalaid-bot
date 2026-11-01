@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Secrets and local settings: never commit.
+.env
+.env.*
+!.env.example
+config.json
