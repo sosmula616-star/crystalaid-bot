@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { connect, createServer } from 'node:net';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -95,17 +95,6 @@ async function runOnce(tag, args) {
   return code;
 }
 
-function freePort() {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolvePort(port));
-    });
-  });
-}
-
 function redisAnswers(port) {
   return new Promise((resolveOk) => {
     const socket = connect({ host: '127.0.0.1', port });
@@ -118,6 +107,43 @@ function redisAnswers(port) {
     socket.once('connect', () => socket.write('PING\r\n'));
     socket.once('data', (data) => finish(data.toString().startsWith('+PONG')));
   });
+}
+
+/** Starts a bundled redis-server on a fixed port and resolves once it answers PING. Fails fast,
+ * with redis's own output, if it cannot start or stay up. */
+async function startBundledRedis() {
+  const port = 6379;
+  const dir = mkdtempSync(join(tmpdir(), 'crystalaid-redis-'));
+  writeFileSync(join(dir, 'redis.conf'), `port ${port}\nbind 127.0.0.1\nprotected-mode no\nsave ""\nappendonly no\ndir ${dir}\n`);
+  const recent = [];
+  const remember = (line) => {
+    recent.push(line);
+    if (recent.length > 20) recent.shift();
+    process.stdout.write(`[redis] ${line}\n`);
+  };
+  const child = spawn('redis-server', [join(dir, 'redis.conf')], { cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+  children.add(child);
+  createInterface({ input: child.stdout }).on('line', remember);
+  createInterface({ input: child.stderr }).on('line', remember);
+  let gone = null;
+  child.once('error', (err) => {
+    gone = `could not start (${err.code ?? err.name})`;
+  });
+  child.once('exit', (code, signal) => {
+    children.delete(child);
+    gone ??= `exited (${code ?? signal})`;
+    if (!stopping) fail(`bundled redis-server ${gone}. Last output:\n${recent.join('\n')}\nSet REDIS_URL to use an external Redis instead.`);
+  });
+  for (let i = 0; i < 200 && !stopping; i++) {
+    if (gone) fail(`bundled redis-server ${gone} before it was ready. Last output:\n${recent.join('\n')}\nSet REDIS_URL to use an external Redis instead.`);
+    if (await redisAnswers(port)) {
+      process.env.REDIS_URL = `redis://127.0.0.1:${port}`;
+      log('bundled Redis is up on 127.0.0.1:6379 (no persistence; it resets when the container restarts)');
+      return;
+    }
+    await sleep(100);
+  }
+  fail(`bundled redis-server did not answer PING in 20s. Last output:\n${recent.join('\n')}`);
 }
 
 /** Restarts `run()` with backoff until the launcher stops. `run` resolves with a reason. */
@@ -195,28 +221,7 @@ async function main() {
   }
 
   // 3. redis
-  if (!process.env.REDIS_URL) {
-    const redisPort = await freePort();
-    process.env.REDIS_URL = `redis://127.0.0.1:${redisPort}`;
-    supervise('redis-server', async () => {
-      const { code } = await start('redis', 'redis-server', [
-        '--bind', '127.0.0.1',
-        '--port', String(redisPort),
-        '--save', '',
-        '--appendonly', 'no',
-        '--protected-mode', 'yes',
-      ]).done;
-      if (code === 127 && !stopping) fail('redis-server is not installed: set REDIS_URL or install redis-server');
-      return `exited (${code})`;
-    });
-    let up = false;
-    for (let i = 0; i < 100 && !stopping && !up; i++) {
-      up = await redisAnswers(redisPort);
-      if (!up) await sleep(100);
-    }
-    if (!up) fail('the bundled redis-server did not answer PING');
-    log('bundled Redis is up on 127.0.0.1 (no persistence)');
-  }
+  if (!process.env.REDIS_URL) await startBundledRedis();
 
   // 4. migrations
   if ((await runOnce('migrate', ['packages/database/src/migrate.ts'])) !== 0) fail('migrations failed');
