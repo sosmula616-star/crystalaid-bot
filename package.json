@@ -1,33 +1,16 @@
 {
-  "name": "crystalaid-bot",
-  "version": "1.0.0",
+  "name": "crystalaid",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.16.1",
-  "engines": {
-    "node": ">=24"
-  },
   "scripts": {
-    "start": "tsx src/index.ts",
+    "build": "pnpm -r --if-present build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/check-css-colors.mjs",
     "test": "vitest run",
-    "db:migrate": "tsx src/db/migrate.ts",
-    "db:generate": "drizzle-kit generate"
-  },
-  "dependencies": {
-    "discord.js": "^14.27.0",
-    "drizzle-orm": "^0.45.4",
-    "fastify": "^5.12.7",
-    "ioredis": "^5.10.0",
-    "pg": "^8.23.1",
-    "tsx": "^4.23.15",
-    "zod": "^4.6.7"
+    "db:migrate": "pnpm --dir packages/database run migrate"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@types/pg": "^8.23.1",
-    "drizzle-kit": "^0.31.11",
     "eslint": "^10.14.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",

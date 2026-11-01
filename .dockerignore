@@ -1,5 +1,11 @@
-node_modules
+**/node_modules
+**/dist
 .git
-.env
-.env.*
-config.json
+**/.env
+**/.env.*
+!apps/activity/.env.mock
+crystalaid.config.json
+apps/activity/e2e/screenshots
+apps/activity/e2e/.results
+.superpowers
+docs/superpowers

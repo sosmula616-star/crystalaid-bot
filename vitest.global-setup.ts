@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { runMigrations } from './src/db/migrations.js';
+import { runMigrations } from './packages/database/src/migrations.js';
 
 export default async function setup(): Promise<void> {
   const envPath = resolve(import.meta.dirname, '.env');

@@ -3,8 +3,16 @@ dist/
 coverage/
 *.log
 
-# Secrets and local settings: never commit.
 .env
 .env.*
 !.env.example
-config.json
+# Holds only the dev-mock switch, no secret.
+!apps/activity/.env.mock
+
+.superpowers/
+
+crystalaid.config.json
+
+# Playwright
+apps/activity/e2e/screenshots/
+apps/activity/e2e/.results/
