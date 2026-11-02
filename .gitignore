@@ -1,5 +1,8 @@
 node_modules/
 dist/
+# The Activity is pre-built and committed, so the image needs no frontend build.
+!apps/activity/dist/
+!apps/activity/dist/**
 coverage/
 *.log
 

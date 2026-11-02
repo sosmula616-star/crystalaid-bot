@@ -1,0 +1,1 @@
+import{o as e,t}from"./index-RavFABir.js";import{k as n}from"./radix-DODyMtD7.js";var r=n();function i(){let{t:n}=t();return(0,r.jsx)(e,{title:n(`shell.placeholder.title`)})}export{i as default};
